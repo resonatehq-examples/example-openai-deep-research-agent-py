@@ -32,9 +32,9 @@ TOOLS = [
     }
 ]
 
-def prompt(ctx: Context, messages) -> dict[str, object]:
+def prompt(ctx: Context, messages) -> ChatCompletionMessage:
     response = aiclient.chat.completions.create(
-        model="gpt-4-1106-preview",
+        model="gpt-4.1",
         messages=messages,
         tools=TOOLS,
         tool_choice="auto"
