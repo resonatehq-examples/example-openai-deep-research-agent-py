@@ -6,7 +6,6 @@ from openai.types.chat import ChatCompletionMessage
 # Resonate HQ
 from resonate import Context, Resonate
 
-resonate = Resonate()
 resonate = Resonate(log_level=logging.DEBUG)
 
 aiclient = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
@@ -32,13 +31,16 @@ TOOLS = [
     }
 ]
 
-def prompt(ctx: Context, messages) -> ChatCompletionMessage:
-    response = aiclient.chat.completions.create(
-        model="gpt-4.1",
-        messages=messages,
-        tools=TOOLS,
-        tool_choice="auto"
-    )
+def prompt(ctx: Context, messages, has_tool_access: bool) -> ChatCompletionMessage:
+    params = {
+        "model": "gpt-5",
+        "messages": messages
+    }
+
+    if has_tool_access:
+        params["tools"] = TOOLS
+
+    response = aiclient.chat.completions.create(**params)
     return response.choices[0].message
 
 SYSTEM_PROMPT = """
@@ -65,7 +67,8 @@ def research(ctx: Context, topic: str, depth: int):
 
     while True:
         # Prompt the LLM
-        message = yield ctx.lfc(prompt, messages)
+        # Only allow tool access if depth > 0
+        message = yield ctx.lfc(prompt, messages, depth > 0)
 
         messages.append(message)
 
@@ -77,18 +80,15 @@ def research(ctx: Context, topic: str, depth: int):
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 if tool_name == "research":
-                    if depth == 0:
-                        result = "you have exceeded the maximum depth. please respond from your knowledge only"
-                        messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
-                    else:
-                        handle = yield ctx.rfi(research, tool_args["topic"], depth - 1)
-                        handles.append((tool_call, handle))
+                    handle = yield ctx.rfi(research, tool_args["topic"], depth - 1)
+                    handles.append((tool_call, handle))
             for (tool_call, handle) in handles:
                 result = yield handle
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
         else:
             return message.content
 
-handle = research.run("research.1", "What are the defining charateristics of distributed systems", 1)
-result = handle.result()
-print(result)
+if __name__ == "__main__":
+    # Run the research
+    result = research.run("research.1", "What are distributed systems", 1)
+    print(result)

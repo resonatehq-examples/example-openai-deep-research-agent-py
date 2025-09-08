@@ -1,5 +1,5 @@
 [project]
-name = "research"
+name = "example-openai-deep-research-agent-py"
 version = "0.1.0"
 description = "A recursive **Deep Research Assistant** powered by OpenAI and Resonate's Distributed Async Await."
 readme = "README.md"
