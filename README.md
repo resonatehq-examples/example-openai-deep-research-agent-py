@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/banner.png" alt="Deep Research Agent — Resonate example" />
+</p>
+
 # Deep Research Assistant
 
 A distributed, recursive Deep Research Agent powered by Resonate and OpenAI. This example demonstrates how complex, distributed agentic applications can be implemented with simple code.
