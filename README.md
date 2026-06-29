@@ -33,7 +33,13 @@ cd example-openai-deep-research-agent-py
 export OPENAI_API_KEY="sk-..."
 ```
 
-### 3. Run the Agent
+### 3. Start a Resonate server
+
+```
+resonate dev
+```
+
+### 4. Run the Agent
 
 This example uses [uv](https://docs.astral.sh/uv/)
 
@@ -46,7 +52,7 @@ uv run research.py
 The Deep Research Agent depends on OpenAI and the OpenAI Python SDK. If you are having trouble, verify that your OpenAI credentials are configured correctly and the model is accessible by running the following command in the project's directory:
 
 ```
-uv run python -c 'import os; from openai import OpenAI; client = OpenAI(api_key=os.environ["OPENAI_API_KEY"]); print(client.chat.completions.create(model="gpt-5", messages=[{"role": "user", "content": "knock knock"}]))'
+uv run python -c 'import asyncio, os; from openai import AsyncOpenAI; client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"]); print(asyncio.run(client.chat.completions.create(model="gpt-5", messages=[{"role": "user", "content": "knock knock"}])))'
 ```
 
 If everything is configured correctly, you will see a response from OpenAI such as:

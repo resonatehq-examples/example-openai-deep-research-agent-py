@@ -1,14 +1,25 @@
+from __future__ import annotations
+
 # Python
-import json, logging, os
+import asyncio
+import json
+import os
+from typing import TYPE_CHECKING
+
 # Open AI
-from openai import OpenAI
+from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessage
+
 # Resonate HQ
-from resonate import Context, Resonate
+from resonate.resonate import Resonate
 
-resonate = Resonate(log_level=logging.DEBUG)
+if TYPE_CHECKING:
+    from resonate.context import Context
 
-aiclient = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+aiclient = AsyncOpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url=os.environ.get("OPENAI_BASE_URL"),
+)
 
 # --- Tool Definitions ---
 TOOLS = [
@@ -31,18 +42,6 @@ TOOLS = [
     }
 ]
 
-def prompt(ctx: Context, messages, has_tool_access: bool) -> ChatCompletionMessage:
-    params = {
-        "model": "gpt-5",
-        "messages": messages
-    }
-
-    if has_tool_access:
-        params["tools"] = TOOLS
-
-    response = aiclient.chat.completions.create(**params)
-    return response.choices[0].message
-
 SYSTEM_PROMPT = """
 You are a recursive research agent.
 
@@ -57,8 +56,21 @@ Always respond with either:
 Be concise and respond in plain English. Avoid repeating the topic verbatim in the subtopics.
 """
 
-@resonate.register
-def research(ctx: Context, topic: str, depth: int):
+
+async def prompt(ctx: Context, messages: list, has_tool_access: bool) -> ChatCompletionMessage:
+    params = {
+        "model": "gpt-5",
+        "messages": messages,
+    }
+
+    if has_tool_access:
+        params["tools"] = TOOLS
+
+    response = await aiclient.chat.completions.create(**params)
+    return response.choices[0].message
+
+
+async def research(ctx: Context, topic: str, depth: int) -> str:
 
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -68,7 +80,7 @@ def research(ctx: Context, topic: str, depth: int):
     while True:
         # Prompt the LLM
         # Only allow tool access if depth > 0
-        message = yield ctx.lfc(prompt, messages, depth > 0)
+        message = await ctx.run(prompt, messages, depth > 0)
 
         messages.append(message)
 
@@ -80,15 +92,27 @@ def research(ctx: Context, topic: str, depth: int):
                 tool_name = tool_call.function.name
                 tool_args = json.loads(tool_call.function.arguments)
                 if tool_name == "research":
-                    handle = yield ctx.rfi(research, tool_args["topic"], depth - 1)
+                    handle = ctx.run(research, tool_args["topic"], depth - 1)
                     handles.append((tool_call, handle))
             for (tool_call, handle) in handles:
-                result = yield handle
+                result = await handle
                 messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
         else:
             return message.content
 
+
+async def main() -> None:
+    r = Resonate(url=os.environ.get("RESONATE_URL", "http://localhost:8001"))
+    r.register(research)
+    r.register(prompt)
+
+    try:
+        # Run the research
+        result = await r.run("research.1", research, "What are distributed systems", 1).result()
+        print(result)
+    finally:
+        await r.stop()
+
+
 if __name__ == "__main__":
-    # Run the research
-    result = research.run("research.1", "What are distributed systems", 1)
-    print(result)
+    asyncio.run(main())
